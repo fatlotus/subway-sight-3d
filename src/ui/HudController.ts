@@ -167,6 +167,7 @@ export class HudController {
   private readonly nextStationEl: HTMLElement;
   private readonly speedEl: HTMLElement;
   private readonly elevationEl: HTMLElement;
+  private readonly headingEl: HTMLElement;
   private readonly gpsStatusEl: HTMLElement;
   private readonly drStatusEl: HTMLElement;
   private readonly timingStatusEl: HTMLElement;
@@ -228,6 +229,7 @@ export class HudController {
   private prevNextStation = '';
   private prevSpeed = '';
   private prevElevation = '';
+  private prevHeading = '';
   private prevGpsStatus = '';
   private prevDrStatus = '';
   private prevTimingStatus = '';
@@ -339,8 +341,13 @@ export class HudController {
     this.elevationEl.setAttribute('data-testid', 'hud-elevation');
     this.elevationEl.textContent = '0 ft Underground';
 
+    this.headingEl = this.doc.createElement('span');
+    this.headingEl.setAttribute('data-testid', 'hud-heading');
+    this.headingEl.textContent = 'N 000°';
+
     metricsWrap.appendChild(this.speedEl);
     metricsWrap.appendChild(this.elevationEl);
+    metricsWrap.appendChild(this.headingEl);
 
     row2.appendChild(stationsWrap);
     row2.appendChild(metricsWrap);
@@ -992,6 +999,18 @@ export class HudController {
     if (elevText !== this.prevElevation) {
       this.prevElevation = elevText;
       this.elevationEl.textContent = elevText;
+    }
+
+    const rawDeg = Number.isFinite(ego.headingRad)
+      ? ((ego.headingRad * 180) / Math.PI) % 360
+      : 0;
+    const bearingDeg = Math.round((rawDeg + 360) % 360) % 360;
+    const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
+    const cardinal = cardinals[Math.round(bearingDeg / 45) % 8];
+    const headingText = `${cardinal} ${String(bearingDeg).padStart(3, '0')}°`;
+    if (headingText !== this.prevHeading) {
+      this.prevHeading = headingText;
+      this.headingEl.textContent = headingText;
     }
 
     // 5. Sensor status pills

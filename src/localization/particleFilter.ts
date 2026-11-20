@@ -421,6 +421,28 @@ export class TrackParticleFilter {
       !drOut.isDwelling &&
       (drOut.speedMps > 1.0 || (gpsRes.speedMps ?? 0) > 1.5);
 
+    const isStationaryLiveFarFromTrack =
+      mode === 'live' &&
+      !this.manualAnchorActive &&
+      gpsRes.acceptedForHardUpdate &&
+      gpsRes.enu !== null &&
+      drOut.isDwelling &&
+      (gpsRes.speedMps ?? 0) < 1.5 &&
+      findNearestTracks(this.dataset, gpsRes.enu, 80, { limit: 1 }).length === 0;
+
+    if (isStationaryLiveFarFromTrack) {
+      this.particles = [];
+      this.hasReceivedGpsFix = true;
+      const state = this.createDefaultState(
+        gpsRes.status,
+        drOut.status,
+        activeContexts.length > 0 ? 'active' : 'degraded',
+        gpsRes.enu,
+      );
+      this.lastState = state;
+      return state;
+    }
+
     // 4. Cold-start particle initialization & single-fix high-accuracy GPS re-localization
     if (this.particles.length === 0) {
       if (gpsRes.acceptedForHardUpdate && gpsRes.enu) {
@@ -1088,14 +1110,32 @@ export class TrackParticleFilter {
       probability: clamp(g.weight, 0, 1),
     }));
 
-    const top = sortedGroups[0];
-    if (!top) {
-      return this.createDefaultState(gpsStatus, drStatus, timingStatus);
+    const rawTop = sortedGroups[0];
+    if (!rawTop) {
+      return this.createDefaultState(gpsStatus, drStatus, timingStatus, fallbackEnu);
+    }
+
+    let top = rawTop;
+    if (
+      !this.manualAnchorActive &&
+      this.lastState.routeId !== null &&
+      this.lastState.serviceType !== 'UNKNOWN' &&
+      this.lastState.direction !== 'UNKNOWN'
+    ) {
+      const prevKey = `${this.lastState.routeId}|${this.lastState.serviceType}|${this.lastState.direction}`;
+      const prevGroup = groupWeights.get(prevKey);
+      if (
+        prevGroup &&
+        prevGroup.weight >= 0.12 &&
+        rawTop.weight < prevGroup.weight + 0.08
+      ) {
+        top = prevGroup;
+      }
     }
 
     const winningCtx = ctxMap.get(top.scheduleId);
     if (!winningCtx) {
-      return this.createDefaultState(gpsStatus, drStatus, timingStatus);
+      return this.createDefaultState(gpsStatus, drStatus, timingStatus, fallbackEnu);
     }
 
     // Weighted mean s, speed, and spread over winning group particles

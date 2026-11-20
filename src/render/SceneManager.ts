@@ -146,11 +146,12 @@ export class SceneManager {
       : Number.isFinite(egoEnu[0])
         ? egoEnu[0]
         : 0;
+    const rawWorldY = Number.isFinite(egoEnu[2]) ? egoEnu[2] : 0;
     const egoWorldY = snapshot.ego.outOfNyc
       ? 140
-      : Number.isFinite(egoEnu[2])
-        ? egoEnu[2]
-        : 0;
+      : inTrain
+        ? rawWorldY
+        : Math.max(rawWorldY, 45);
     const egoWorldZ = snapshot.ego.outOfNyc
       ? 0
       : Number.isFinite(egoEnu[1])
@@ -177,8 +178,8 @@ export class SceneManager {
 
     this.cameraController.update(
       this.scratchEgoLocalPos,
-      snapshot.ego.outOfNyc ? 0 : snapshot.ego.headingRad,
-      snapshot.ego.outOfNyc ? -0.35 : snapshot.ego.pitchRad,
+      inTrain ? snapshot.ego.headingRad : 0,
+      inTrain ? snapshot.ego.pitchRad : snapshot.ego.outOfNyc ? -0.35 : -0.25,
       dtSec,
     );
 
