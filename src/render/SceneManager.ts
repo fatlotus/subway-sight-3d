@@ -139,10 +139,25 @@ export class SceneManager {
   public update(snapshot: WorldStateSnapshot, dtSec: number): void {
     if (this.disposed) return;
 
+    const inTrain = !snapshot.ego.outOfNyc && snapshot.ego.routeId !== null;
     const egoEnu = snapshot.ego.positionEnu;
-    const egoWorldX = Number.isFinite(egoEnu[0]) ? egoEnu[0] : 0;
-    const egoWorldY = Number.isFinite(egoEnu[2]) ? egoEnu[2] : 0;
-    const egoWorldZ = Number.isFinite(egoEnu[1]) ? (egoEnu[1] === 0 ? 0 : -egoEnu[1]) : 0;
+    const egoWorldX = snapshot.ego.outOfNyc
+      ? 0
+      : Number.isFinite(egoEnu[0])
+        ? egoEnu[0]
+        : 0;
+    const egoWorldY = snapshot.ego.outOfNyc
+      ? 140
+      : Number.isFinite(egoEnu[2])
+        ? egoEnu[2]
+        : 0;
+    const egoWorldZ = snapshot.ego.outOfNyc
+      ? 0
+      : Number.isFinite(egoEnu[1])
+        ? egoEnu[1] === 0
+          ? 0
+          : -egoEnu[1]
+        : 0;
 
     // Floating-origin rebase when horizontal distance from chunk origin exceeds 5 km
     const dxOrigin = egoWorldX - this.originOffset.x;
@@ -162,17 +177,20 @@ export class SceneManager {
 
     this.cameraController.update(
       this.scratchEgoLocalPos,
-      snapshot.ego.headingRad,
-      snapshot.ego.pitchRad,
+      snapshot.ego.outOfNyc ? 0 : snapshot.ego.headingRad,
+      snapshot.ego.outOfNyc ? -0.35 : snapshot.ego.pitchRad,
       dtSec,
     );
 
-    this.carInteriorLayer.update(
-      this.scratchEgoLocalPos,
-      snapshot.ego.headingRad,
-      snapshot.ego.pitchRad,
-      viewMode,
-    );
+    this.carInteriorLayer.group.visible = inTrain;
+    if (inTrain) {
+      this.carInteriorLayer.update(
+        this.scratchEgoLocalPos,
+        snapshot.ego.headingRad,
+        snapshot.ego.pitchRad,
+        viewMode,
+      );
+    }
 
     this.trainLayer.update(snapshot, viewMode, this.originOffset);
 

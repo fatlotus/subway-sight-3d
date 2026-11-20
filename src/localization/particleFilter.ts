@@ -707,6 +707,7 @@ export class TrackParticleFilter {
       gpsRes.status,
       drOut.status,
       activeContexts.length > 0 ? 'active' : 'degraded',
+      gpsRes.enu,
     );
     this.lastState = state;
     return state;
@@ -784,7 +785,7 @@ export class TrackParticleFilter {
       projByTrackId.has(ctx.effectiveTrack.id),
     );
     if (candidates.length === 0) {
-      this.spawnUniformParticles(activeContexts);
+      this.particles = [];
       return;
     }
 
@@ -1041,9 +1042,10 @@ export class TrackParticleFilter {
     gpsStatus: EstimatorState['sensorStatus']['gps'],
     drStatus: EstimatorState['sensorStatus']['dr'],
     timingStatus: EstimatorState['sensorStatus']['timing'],
+    fallbackEnu?: Vec3 | null,
   ): EstimatorState {
     if (this.particles.length === 0) {
-      return this.createDefaultState(gpsStatus, drStatus, timingStatus);
+      return this.createDefaultState(gpsStatus, drStatus, timingStatus, fallbackEnu);
     }
 
     // Aggregate weights by (routeId, serviceType, direction)
@@ -1211,28 +1213,38 @@ export class TrackParticleFilter {
     gpsStatus: EstimatorState['sensorStatus']['gps'],
     drStatus: EstimatorState['sensorStatus']['dr'],
     timingStatus: EstimatorState['sensorStatus']['timing'],
+    fallbackEnu?: Vec3 | null,
   ): EstimatorState {
+    const hasGpsEnu = Boolean(
+      fallbackEnu &&
+        Number.isFinite(fallbackEnu[0]) &&
+        Number.isFinite(fallbackEnu[1]),
+    );
+    const enu: Vec3 = hasGpsEnu ? [fallbackEnu![0], fallbackEnu![1], 2] : [0, 0, -15];
+    const latLng = enuToWgs84(enu[0], enu[1], enu[2]);
     return {
       routeId: null,
       serviceType: 'UNKNOWN',
       direction: 'UNKNOWN',
-      displayLabel: 'Locating Train…',
+      displayLabel: hasGpsEnu ? 'Not Near a Rail Line' : 'Locating Train…',
       confidencePct: 0,
       candidates: [],
       currentStationId: null,
-      currentStationName: 'Locating…',
+      currentStationName: hasGpsEnu ? 'Street Level' : 'Locating…',
       nextStationId: null,
       nextStationName: '—',
       etaSec: null,
-      positionEnu: [0, 0, -15],
-      positionLatLng: { lat: LAT_0, lon: LON_0 },
+      positionEnu: enu,
+      positionLatLng: hasGpsEnu
+        ? { lat: latLng.lat, lon: latLng.lon }
+        : { lat: LAT_0, lon: LON_0 },
       headingRad: 0,
       pitchRad: 0,
       speedMps: 0,
       speedMph: 0,
-      elevationM: -15,
-      elevationFt: -15 * METERS_TO_FEET,
-      structure: 'UNDERGROUND_TUNNEL',
+      elevationM: enu[2],
+      elevationFt: enu[2] * METERS_TO_FEET,
+      structure: hasGpsEnu ? 'AT_GRADE' : 'UNDERGROUND_TUNNEL',
       outOfNyc: false,
       manualAnchorActive: this.manualAnchorActive,
       sensorStatus: {
