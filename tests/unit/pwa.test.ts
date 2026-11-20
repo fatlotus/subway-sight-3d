@@ -600,7 +600,7 @@ describe('PWA: static offline audit', () => {
     expect(parsed.display).toBe('standalone');
     expect(parsed.icons.length).toBeGreaterThanOrEqual(2);
     for (const icon of parsed.icons) {
-      expect(icon.src.startsWith('/icons/')).toBe(true);
+      expect(icon.src.startsWith('./icons/') || icon.src.startsWith('/icons/')).toBe(true);
     }
   });
 

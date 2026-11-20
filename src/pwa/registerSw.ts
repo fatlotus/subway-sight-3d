@@ -66,8 +66,12 @@ function isConnectionReportingOffline(conn: NetworkInformationLike | null): bool
 export function registerServiceWorker(
   options?: RegisterSwOptions,
 ): SwController {
-  const swUrl = options?.swUrl ?? '/sw.js';
-  const scope = options?.scope ?? '/';
+  const baseUrl =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL) ||
+    '/';
+  const swUrl = options?.swUrl ?? `${baseUrl}sw.js`;
+  const scope = options?.scope ?? baseUrl;
 
   const swContainer =
     typeof navigator !== 'undefined' &&
